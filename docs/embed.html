@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fraud scoring widget</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0c10'/%3E%3Ccircle cx='16' cy='16' r='6.5' fill='%23f5a623'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
+<style>
+  :root{--bg:#0a0c10;--panel:#0e1218;--line:rgba(255,255,255,.09);--line2:rgba(255,255,255,.16);
+    --text:#e9ecf1;--muted:#8a94a4;--faint:#5b6473;--approve:#34c984;--review:#f5a623;--block:#ff5247;--accent:#f5a623;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;padding:16px;
+    -webkit-font-smoothing:antialiased;font-variant-ligatures:none}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:18px;max-width:440px;margin:0 auto;position:relative}
+  .hd{display:flex;justify-content:space-between;align-items:center;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);margin-bottom:10px}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--approve);display:inline-block;margin-right:6px;vertical-align:middle}
+  .presets{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
+  .presets button,.rnd{font-family:'JetBrains Mono',monospace;font-size:11.5px;background:var(--bg);border:1px solid var(--line2);color:var(--muted);padding:8px;border-radius:8px;cursor:pointer;transition:.16s;text-align:left}
+  .presets button:hover,.rnd:hover{border-color:var(--accent);color:var(--text)}
+  .presets button.on{border-color:var(--accent);color:var(--text);background:rgba(245,166,35,.1)}
+  .rnd{width:100%;text-align:center;margin-bottom:14px}
+  .gw{text-align:center}
+  svg{width:230px;max-width:100%;height:auto;overflow:visible}
+  .gt{fill:none;stroke:#11151d;stroke-width:16;stroke-linecap:round}
+  .gf{fill:none;stroke-width:16;stroke-linecap:round;transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1),stroke 1s}
+  .nd{transform-origin:150px 160px;transition:transform 1s cubic-bezier(.34,1.2,.4,1);transform:rotate(-90deg)}
+  .sc{font-family:'Fraunces',serif;font-weight:600;font-size:46px;line-height:1;margin-top:-4px}
+  .cap{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);margin-top:5px}
+  .dec{margin-top:16px;font-weight:700;font-size:13px;letter-spacing:.07em;text-transform:uppercase;padding:9px 18px;border-radius:9px;border:1px solid var(--line2);color:var(--muted);display:inline-block}
+  .vd{font-size:11.5px;color:var(--muted);margin-top:12px;line-height:1.45;min-height:30px}
+  .ft{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:10.5px;color:var(--faint);display:flex;justify-content:space-between}
+  .ft a{color:var(--accent);text-decoration:none}
+  .veil{position:absolute;inset:0;background:rgba(10,12,16,.85);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);border-radius:14px;transition:opacity .4s}
+  .veil.hidden{opacity:0;pointer-events:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="veil" id="veil">loading model…</div>
+  <div class="hd"><span><span class="dot"></span>fraud scorer</span><span id="lat"></span></div>
+  <div class="presets" id="presets"></div>
+  <button class="rnd" id="rnd">🎲 Random real transaction</button>
+  <div class="gw">
+    <svg viewBox="0 0 300 180">
+      <path class="gt" d="M 30 160 A 120 120 0 0 1 270 160" />
+      <path class="gf" id="gf" d="M 30 160 A 120 120 0 0 1 270 160" />
+      <g class="nd" id="nd"><line x1="150" y1="160" x2="150" y2="64" stroke="#fff" stroke-width="3" stroke-linecap="round"/><circle cx="150" cy="160" r="6" fill="#fff"/></g>
+    </svg>
+    <div class="sc" id="sc">—</div>
+    <div class="cap">fraud probability</div>
+    <div class="dec" id="dec">awaiting input</div>
+    <div class="vd" id="vd">Pick a transaction.</div>
+  </div>
+  <div class="ft"><span id="ver">in-browser · ONNX</span><a href="https://rohitsudhakar1.github.io/fraud-detection-pipeline/" target="_blank" rel="noopener">full demo ↗</a></div>
+</div>
+<script>
+const EX=[
+ {n:"Clear fraud",a:1,tx:{"V1":-13.1927,"V2":12.786,"V3":-9.9067,"V4":3.3203,"V5":-4.8012,"V6":5.7601,"V7":-18.7509,"V8":-37.3534,"V9":-0.3915,"V10":-5.0525,"V11":4.4068,"V12":-4.6108,"V13":-1.9095,"V14":-9.0727,"V15":-0.2261,"V16":-6.2116,"V17":-6.2481,"V18":-3.1492,"V19":0.0516,"V20":-3.493,"V21":27.2028,"V22":-8.887,"V23":5.3036,"V24":-0.6394,"V25":0.2632,"V26":-0.1089,"V27":1.2696,"V28":0.9394,"Time":68207,"Amount":1.0}},
+ {n:"Hardest fraud",a:1,tx:{"V1":-0.2349,"V2":0.3554,"V3":1.9722,"V4":-1.2556,"V5":-0.6814,"V6":-0.6657,"V7":0.0591,"V8":-0.0032,"V9":1.1225,"V10":-1.4812,"V11":-0.4739,"V12":0.9222,"V13":0.9135,"V14":-0.4993,"V15":0.9339,"V16":-0.5605,"V17":-0.2077,"V18":0.3805,"V19":0.5743,"V20":-0.0035,"V21":0.2207,"V22":0.9121,"V23":-0.2863,"V24":0.4512,"V25":0.1883,"V26":-0.5318,"V27":0.1232,"V28":0.0396,"Time":44532,"Amount":1.0}},
+ {n:"Fraud-like legit",a:0,tx:{"V1":-17.9506,"V2":11.0671,"V3":-20.7427,"V4":6.0755,"V5":-13.3898,"V6":-4.5329,"V7":-15.1881,"V8":12.1011,"V9":-4.0269,"V10":-9.0174,"V11":6.0706,"V12":-8.5679,"V13":-0.0019,"V14":-9.3012,"V15":0.0198,"V16":-7.3521,"V17":-13.9232,"V18":-4.9883,"V19":1.3477,"V20":1.7129,"V21":1.7971,"V22":-1.2757,"V23":-0.705,"V24":0.102,"V25":1.1775,"V26":-0.2387,"V27":1.5545,"V28":0.5479,"Time":26217,"Amount":1.0}},
+ {n:"Clear legit",a:0,tx:{"V1":1.8659,"V2":-0.4177,"V3":-1.6165,"V4":0.145,"V5":0.8437,"V6":0.891,"V7":-0.0231,"V8":0.1932,"V9":0.606,"V10":-0.1023,"V11":-0.568,"V12":0.4428,"V13":-0.1341,"V14":0.3364,"V15":0.6362,"V16":-0.9861,"V17":0.4945,"V18":-2.0519,"V19":-0.7287,"V20":-0.1834,"V21":-0.1677,"V22":-0.371,"V23":0.3135,"V24":-0.5509,"V25":-0.3669,"V26":0.3496,"V27":-0.0402,"V28":-0.0616,"Time":144761,"Amount":56.83}},
+];
+const TR=0.43,TB=0.95,ARC=377;
+let META,SX,SL,SAMPLE=[],actual=1;
+const gf=document.getElementById('gf');gf.style.strokeDasharray=ARC;gf.style.strokeDashoffset=ARC;
+function bv(tx){const fc=META.feature_cols,h=Math.floor(tx.Time/3600)%24,la=Math.log(1+tx.Amount),e=META.amount_bins;let b=0;for(let k=0;k<e.length-1;k++){if(tx.Amount>e[k]&&tx.Amount<=e[k+1]){b=k;break;}}const d={hour_of_day:h,log_amount:la,amount_band:b};const v=new Float32Array(fc.length);for(let i=0;i<fc.length;i++){const c=fc[i];v[i]=(c in tx)?tx[c]:d[c];}return v;}
+function ip(xs,ys,p){const n=xs.length;if(p<=xs[0])return ys[0];if(p>=xs[n-1])return ys[n-1];let lo=0,hi=n-1;while(hi-lo>1){const m=(lo+hi)>>1;if(xs[m]<=p)lo=m;else hi=m;}return ys[lo]+(p-xs[lo])/(xs[hi]-xs[lo])*(ys[hi]-ys[lo]);}
+async function score(tx){const v=bv(tx);const rx=await SX.run({input:new ort.Tensor('float32',v,[1,v.length])});const rl=await SL.run({input:new ort.Tensor('float32',v,[1,v.length])});return META.weight_xgb*ip(META.iso_xgb.x,META.iso_xgb.y,rx.probabilities.data[1])+(1-META.weight_xgb)*ip(META.iso_lgb.x,META.iso_lgb.y,rl.probabilities.data[1]);}
+function col(s){return s>=TB?'var(--block)':s>=TR?'var(--review)':'var(--approve)';}
+function paint(s,lat){const c=col(s);gf.style.stroke=c;gf.style.strokeDashoffset=ARC*(1-s);document.getElementById('nd').style.transform=`rotate(${s*180-90}deg)`;
+  const el=document.getElementById('sc');let x=0;clearInterval(el._i);el._i=setInterval(()=>{x+=s/20;if(x>=s){x=s;clearInterval(el._i);}el.textContent=x.toFixed(4);el.style.color=c;},26);
+  const txt=s>=TB?'BLOCK':s>=TR?'MANUAL REVIEW':'APPROVE';const d=document.getElementById('dec');d.textContent=txt;d.style.color=c;d.style.borderColor=c;
+  let v='';if(actual===null){v=s>=TB?'Auto-blocked (≥0.95).':s>=TR?'Routed to manual review.':'Approved; no friction.';}
+  else{const f=actual===1,pf=s>=TR;v=f&&s>=TB?'Caught — true fraud, blocked.':f&&pf?'Flagged — true fraud to review.':f?'Missed — a real fraud below threshold.':s>=TB?'False positive — good customer blocked.':pf?'Legit, flagged for review (safe failure).':'Approved — legitimate, near zero.';}
+  document.getElementById('vd').textContent=v;document.getElementById('lat').textContent=lat+' ms';}
+async function run(tx,a){actual=a;const t0=performance.now();const s=await score(tx);paint(s,Math.max(1,Math.round(performance.now()-t0)));}
+const pc=document.getElementById('presets');
+EX.forEach((e,i)=>{const b=document.createElement('button');b.textContent=e.n;b.onclick=()=>{[...pc.children].forEach(x=>x.classList.remove('on'));b.classList.add('on');run(e.tx,e.a);};pc.appendChild(b);});
+document.getElementById('rnd').onclick=()=>{[...pc.children].forEach(x=>x.classList.remove('on'));const s=SAMPLE.length?SAMPLE[Math.floor(Math.random()*SAMPLE.length)]:{tx:EX[0].tx,actual:EX[0].a};run(s.tx,s.actual);};
+(async()=>{try{ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/';const base=new URL('model/',location.href).href;
+  META=await(await fetch(base+'meta.json')).json();SX=await ort.InferenceSession.create(base+'xgb.onnx');SL=await ort.InferenceSession.create(base+'lgb.onnx');
+  try{SAMPLE=await(await fetch(base+'sample.json')).json();}catch(e){}
+  document.getElementById('veil').classList.add('hidden');pc.children[0].classList.add('on');run(EX[0].tx,EX[0].a);
+}catch(e){document.getElementById('veil').textContent='load failed: '+e.message;}})();
+</script>
+</body>
+</html>

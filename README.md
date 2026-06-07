@@ -34,6 +34,26 @@ curve, not the ROC curve — at this class imbalance (0.172% fraud), ROC is
 misleading. Latency figures are intentionally left unmeasured until the
 Lambda deploy lands; they will be filled from real CloudWatch percentiles.
 
+See the [model card](MODEL_CARD.md) for intended use, training data, and known
+limitations (including the frauds this model misses).
+
+## Live demo & embedding
+
+The [demo site](https://rohitsudhakar1.github.io/fraud-detection-pipeline/) runs
+the **actual model in your browser** — the calibrated XGBoost + LightGBM
+ensemble is exported to ONNX (`scripts/export_onnx.py`) and executed with
+onnxruntime-web, reproducing the Python outputs to within ~1e-4. You can score
+the held-out presets, load a random real transaction, or edit any feature and
+watch the decision, per-prediction occlusion attributions, and diagnostic
+charts update live. No backend required.
+
+A compact widget version is available for embedding:
+
+```html
+<iframe src="https://rohitsudhakar1.github.io/fraud-detection-pipeline/embed.html"
+        width="480" height="640" style="border:0" title="Fraud scoring demo"></iframe>
+```
+
 ## Architecture
 
 ```

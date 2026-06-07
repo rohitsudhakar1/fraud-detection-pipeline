@@ -55,6 +55,17 @@ def _strip_zipmap(model):
     return model
 
 
+def _drop_label_output(model):
+    """Keep only the probabilities graph output. The unused 'label' output has a
+    fixed [1] shape that triggers a benign ORT warning on batched (N>1) runs."""
+    g = model.graph
+    keep = [o for o in g.output if o.name != "label"]
+    if keep and len(keep) < len(g.output):
+        del g.output[:]
+        g.output.extend(keep)
+    return model
+
+
 def _iso(cal):
     """Extract isotonic breakpoints as plain lists for JS interpolation."""
     return {"x": [float(v) for v in cal.X_thresholds_],
@@ -92,8 +103,8 @@ def main() -> int:
     init = [("input", FloatTensorType([None, n]))]
     # zipmap=False -> probabilities come back as a clean [N,2] float tensor
     # (no sequence-of-maps), which is far simpler to read in onnxruntime-web.
-    onx_xgb = _strip_zipmap(convert_xgboost(xgb_est, initial_types=init, target_opset=12))
-    onx_lgb = _strip_zipmap(convert_lightgbm(lgb_est, initial_types=init, target_opset=12))
+    onx_xgb = _drop_label_output(_strip_zipmap(convert_xgboost(xgb_est, initial_types=init, target_opset=12)))
+    onx_lgb = _drop_label_output(_strip_zipmap(convert_lightgbm(lgb_est, initial_types=init, target_opset=12)))
     with open(f"{OUT_DIR}/xgb.onnx", "wb") as f:
         f.write(onx_xgb.SerializeToString())
     with open(f"{OUT_DIR}/lgb.onnx", "wb") as f:

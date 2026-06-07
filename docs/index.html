@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Fraud Detection Pipeline — Real-time risk scoring console</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230a0c10'/%3E%3Ccircle cx='16' cy='16' r='6.5' fill='%23f5a623'/%3E%3C/svg%3E" />
 <meta name="description" content="XGBoost + LightGBM fraud-scoring ensemble with isotonic calibration. PR-AUC 0.877, 89.8% recall at 0.1% false-positive rate. Interactive scoring console over real held-out transactions." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -209,6 +210,19 @@
   .step h3{font-family:'Fraunces',serif;font-weight:600;font-size:21px;margin:14px 0 9px;letter-spacing:-.01em}
   .step p{color:var(--muted);font-size:14px;line-height:1.55}
 
+  /* ---------- DIAGNOSTIC CHARTS ---------- */
+  .charts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media(max-width:860px){.charts{grid-template-columns:1fr}}
+  .chart{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:20px}
+  .chart h4{font-family:'Fraunces',serif;font-weight:600;font-size:17px;margin-bottom:3px}
+  .chart .csub{color:var(--muted);font-size:12.5px;margin-bottom:14px;line-height:1.45;min-height:50px}
+  .chart svg{width:100%;height:auto;display:block}
+  .ax{stroke:var(--line-2);stroke-width:1}
+  .axt{fill:var(--faint);font-family:'JetBrains Mono',monospace;font-size:8.5px}
+  .legend{display:flex;gap:16px;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--muted);flex-wrap:wrap}
+  .legend span{display:flex;align-items:center;gap:6px}
+  .legend i{width:14px;height:3px;border-radius:2px;display:inline-block}
+
   /* ---------- ARCHITECTURE ---------- */
   .arch{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:34px;display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:stretch}
   @media(max-width:860px){.arch{grid-template-columns:1fr 1fr}}
@@ -237,6 +251,7 @@
     <div class="nav-links">
       <a href="#console">Console</a>
       <a href="#how">How it works</a>
+      <a href="#diagnostics">Diagnostics</a>
       <a href="#arch">Architecture</a>
       <a class="nav-cta" href="https://github.com/rohitsudhakar1/fraud-detection-pipeline" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -348,9 +363,36 @@
   </div>
 </section>
 
+<section id="diagnostics">
+  <div class="wrap">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Model diagnostics</h2></div>
+    <p class="sec-sub">All three charts are computed from the real model on the held-out test set (56,962 transactions, 98 fraud) — not illustrations. They are the plots you actually use to choose an operating threshold.</p>
+    <div class="charts">
+      <div class="chart">
+        <h4>Precision &amp; recall vs threshold</h4>
+        <div class="csub">As the threshold rises, precision climbs and recall falls. The bands mark where transactions get reviewed (0.43) and auto-blocked (0.95).</div>
+        <svg id="ch-sweep" viewBox="0 0 320 210"></svg>
+        <div class="legend"><span><i style="background:var(--review)"></i>precision</span><span><i style="background:var(--approve)"></i>recall</span><span><i style="background:var(--block)"></i>F1</span></div>
+      </div>
+      <div class="chart">
+        <h4>Calibration reliability</h4>
+        <div class="csub">Predicted probability vs observed fraud rate per bin. Points near the diagonal mean the score is trustworthy. Mid bins are sparse (few of the 98 frauds land there).</div>
+        <svg id="ch-cal" viewBox="0 0 320 210"></svg>
+        <div class="legend"><span><i style="background:var(--accent)"></i>model</span><span><i style="background:var(--faint)"></i>perfect</span></div>
+      </div>
+      <div class="chart">
+        <h4>Precision-recall curve</h4>
+        <div class="csub">The whole tradeoff at a glance. Area under this curve is the PR-AUC of 0.877 — the headline metric for imbalanced detection.</div>
+        <svg id="ch-pr" viewBox="0 0 320 210"></svg>
+        <div class="legend"><span><i style="background:var(--accent)"></i>PR curve</span><span>PR-AUC 0.877</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="arch">
   <div class="wrap">
-    <div class="sec-head"><span class="sec-num">03</span><h2>Operational surface</h2></div>
+    <div class="sec-head"><span class="sec-num">04</span><h2>Operational surface</h2></div>
     <p class="sec-sub">The model is one piece. What makes it usable is the surface around it: low-latency serving, prediction logging for drift replay, and artifact versioning. Built to mirror how real fraud-risk teams operate.</p>
     <div class="arch">
       <div class="arch-flow">merchant POST&nbsp;&nbsp;→&nbsp;&nbsp;API Gateway&nbsp;&nbsp;→&nbsp;&nbsp;scored in-memory&nbsp;&nbsp;→&nbsp;&nbsp;logged async</div>
@@ -570,6 +612,46 @@ document.getElementById('btn-reset').onclick=()=>selectPreset(selectedPreset);
     veil.querySelector('.spin').style.display='none';
   }
 })();
+
+/* ---- diagnostic charts (drawn from real eval data) ---- */
+const NS='http://www.w3.org/2000/svg';
+const PAD={l:34,r:10,t:12,b:24}, CW=320, CH=210;
+function sx(x){return PAD.l+x*(CW-PAD.l-PAD.r);}
+function sy(y){return CH-PAD.b-y*(CH-PAD.t-PAD.b);}
+function el(tag,attrs){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);return e;}
+function axes(svg,xlab,ylab){
+  svg.appendChild(el('line',{class:'ax',x1:PAD.l,y1:sy(0),x2:CW-PAD.r,y2:sy(0)}));
+  svg.appendChild(el('line',{class:'ax',x1:PAD.l,y1:sy(0),x2:PAD.l,y2:PAD.t}));
+  [0,0.5,1].forEach(v=>{
+    const tx=el('text',{class:'axt',x:sx(v),y:CH-PAD.b+12,'text-anchor':'middle'});tx.textContent=v;svg.appendChild(tx);
+    const ty=el('text',{class:'axt',x:PAD.l-6,y:sy(v)+3,'text-anchor':'end'});ty.textContent=v;svg.appendChild(ty);
+  });
+  const xl=el('text',{class:'axt',x:(PAD.l+CW-PAD.r)/2,y:CH-2,'text-anchor':'middle'});xl.textContent=xlab;svg.appendChild(xl);
+}
+function poly(svg,pts,color,w){
+  const d=pts.map((p,i)=>(i?'L':'M')+sx(p[0]).toFixed(1)+' '+sy(p[1]).toFixed(1)).join(' ');
+  svg.appendChild(el('path',{d,fill:'none',stroke:color,'stroke-width':w||2,'stroke-linejoin':'round'}));
+}
+function vline(svg,x,color){svg.appendChild(el('line',{x1:sx(x),y1:PAD.t,x2:sx(x),y2:sy(0),stroke:color,'stroke-width':1,'stroke-dasharray':'3 3',opacity:.6}));}
+async function drawCharts(){
+  let c; try{ c=await (await fetch(new URL('model/curves.json',location.href))).json(); }catch(e){ return; }
+  // 1) sweep
+  const sw=document.getElementById('ch-sweep'); axes(sw,'threshold');
+  vline(sw,c.thresholds.review,'var(--review)'); vline(sw,c.thresholds.block,'var(--block)');
+  poly(sw,c.sweep.map(r=>[r.t,r.precision]),'var(--review)');
+  poly(sw,c.sweep.map(r=>[r.t,r.recall]),'var(--approve)');
+  poly(sw,c.sweep.map(r=>[r.t,r.f1]),'var(--block)',1.4);
+  // 2) calibration
+  const ca=document.getElementById('ch-cal'); axes(ca,'predicted prob');
+  poly(ca,[[0,0],[1,1]],'var(--faint)',1);
+  c.calibration.forEach(b=>{ const r=Math.max(2.2,Math.min(6,Math.sqrt(b.n)/2));
+    ca.appendChild(el('circle',{cx:sx(b.pred),cy:sy(b.obs),r,fill:'var(--accent)','fill-opacity':.85})); });
+  poly(ca,c.calibration.map(b=>[b.pred,b.obs]),'var(--accent)',1.2);
+  // 3) PR curve
+  const pr=document.getElementById('ch-pr'); axes(pr,'recall');
+  poly(pr,c.pr.map(p=>[p.r,p.p]),'var(--accent)',2);
+}
+drawCharts();
 
 /* ---- metric count-up on view ---- */
 const io=new IntersectionObserver((es)=>{es.forEach(en=>{if(!en.isIntersecting)return;
