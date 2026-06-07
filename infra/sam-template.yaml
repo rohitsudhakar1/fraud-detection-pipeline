@@ -1,0 +1,65 @@
+# AWS SAM template for the fraud-detection scoring service.
+# Build:   sam build --use-container
+# Deploy:  sam deploy --guided  (first time only)
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Real-time fraud-detection scoring on Lambda + API Gateway.
+
+Parameters:
+  PredictionLogDsn:
+    Type: String
+    NoEcho: true
+    Description: PostgreSQL DSN for the prediction log. Empty disables logging.
+    Default: ""
+
+Globals:
+  Function:
+    Timeout: 5
+    MemorySize: 1024
+    Tracing: Active
+    Environment:
+      Variables:
+        MODEL_PATH: /var/task/artifacts/model.pkl
+        PREDICTION_LOG_DSN: !Ref PredictionLogDsn
+        DECISION_AUTO_BLOCK: "0.95"
+        DECISION_REVIEW: "0.43"
+
+Resources:
+  ScoringFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      PackageType: Image
+      Architectures: [x86_64]
+      ProvisionedConcurrencyConfig:
+        ProvisionedConcurrentExecutions: 2
+      AutoPublishAlias: live
+      Events:
+        ScoreApi:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+    Metadata:
+      DockerTag: scoring-latest
+      DockerContext: ../
+      Dockerfile: Dockerfile
+
+  ScoringAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: fraud-scoring-p99-latency
+      MetricName: Duration
+      Namespace: AWS/Lambda
+      Statistic: p99
+      Period: 60
+      EvaluationPeriods: 3
+      Threshold: 200
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ScoringFunction
+
+Outputs:
+  ApiEndpoint:
+    Description: HTTPS URL for the scoring API
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com/"
