@@ -10,7 +10,7 @@ train:
 	python scripts/train.py --data data/creditcard.csv --out artifacts/model.pkl
 
 eval:
-	python -c "from src.model import load_bundle; from src.evaluate import threshold_sweep; import pandas as pd; print('see notebooks/eda.py for full eval')"
+	python scripts/eval.py --data data/creditcard.csv --model artifacts/model.pkl
 
 serve:
 	MODEL_PATH=artifacts/model.pkl uvicorn src.score_api:app --port 8000 --reload

@@ -13,22 +13,22 @@ hooks — is what makes it usable in production.
 
 ## Headline Results
 
-> **Status: pending training run.** The metrics below are populated directly
-> from `python scripts/train.py` on the held-out test split. Until that run
-> lands, this table is intentionally blank — no benchmark or placeholder
-> numbers are quoted here.
+Measured on the held-out 20% test split (56,962 transactions, 98 fraud),
+stratified, `random_state=42`. Reproduce with `python scripts/eval.py`.
 
-| Metric                          | Value |
-|---------------------------------|-------|
-| ROC-AUC (test set)              | _TBD_ |
-| PR-AUC (test set)               | _TBD_ |
-| Recall @ 0.1% false-positive    | _TBD_ |
-| F1 at tuned threshold           | _TBD_ |
+| Metric                          | Value      |
+|---------------------------------|------------|
+| ROC-AUC (test set)              | **0.984**  |
+| PR-AUC (test set)               | **0.877**  |
+| Recall @ 0.1% false-positive    | **0.898**  |
+| F1 at tuned threshold (t=0.55)  | **0.857**  |
 | Median scoring latency (Lambda) | _TBD — measure after deploy_ |
 | p99 scoring latency             | _TBD — measure after deploy_ |
 
-The decision threshold is chosen on the precision-recall curve, not the ROC
-curve — at this class imbalance (0.172% fraud), ROC is misleading.
+The threshold (`t=0.55`) is the F1-optimal point on the precision-recall
+curve, not the ROC curve — at this class imbalance (0.172% fraud), ROC is
+misleading. Latency figures are intentionally left unmeasured until the
+Lambda deploy lands; they will be filled from real CloudWatch percentiles.
 
 ## Architecture
 
@@ -70,7 +70,7 @@ re-evaluation when a new model version is trained.
   reasonable but are not well-calibrated — you cannot trust `score=0.8` to
   mean "8 in 10 will be fraud." Isotonic regression fixes that, which matters
   the moment downstream systems set policy on the score (e.g., "auto-block at
-  >0.95, manual review at >0.6").
+  >=0.95, manual review at >=0.43" — the defaults in `score_api.py`).
 - **Threshold tuning on PR curve.** Cost-asymmetric. False negatives at a
   payments processor are dollars-out-the-door; false positives are friction
   for good customers. We tune the threshold on the precision-recall tradeoff
@@ -133,7 +133,7 @@ Response:
 ## Deployment notes
 
 Lambda container image (Python 3.11 base) keeps the model in memory between
-invocations to avoid the 1.2s cold-start of reloading the booster. Set
+invocations to avoid paying the cold-start cost of reloading the booster. Set
 provisioned concurrency to 2 in production. Postgres logging is async (fire
 and forget through SQS) so it stays off the scoring path. Latency targets are
 sub-50 ms p50; actual figures to be measured once deployed.

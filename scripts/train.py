@@ -11,6 +11,10 @@ import sys
 
 import pandas as pd
 
+# Windows consoles default to cp1252; force UTF-8 so log glyphs don't crash.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.model import save_bundle, train_ensemble  # noqa: E402
