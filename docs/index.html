@@ -193,6 +193,7 @@
   .ex-up i{background:var(--block);left:0}
   .ex-down i{background:var(--approve);right:0}
   .ex-cap{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.5}
+  .ex-none{font-size:13px;color:var(--muted);line-height:1.55;padding:10px 14px;border:1px dashed var(--line-2);border-radius:9px;background:var(--bg-1)}
 
   /* loading veil */
   .veil{position:absolute;inset:0;background:rgba(8,10,14,.82);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:20;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--muted);transition:opacity .4s;border-radius:var(--r)}
@@ -566,13 +567,25 @@ function paint(score,latency){
 }
 
 function renderExplain(ds){
-  const maxAbs=Math.max(...ds.map(d=>Math.abs(d.delta)),1e-6);
-  document.getElementById('ex-rows').innerHTML=ds.map(d=>{
-    const up=d.delta>0, w=Math.max(4,Math.abs(d.delta)/maxAbs*100);
+  const wrap=document.getElementById('explain'), cap=wrap.querySelector('.ex-cap');
+  const maxAbs=Math.max(...ds.map(d=>Math.abs(d.delta)));
+  wrap.style.display='block';
+  // When the score is confident-low, resetting any single feature to its median
+  // barely moves it — so deltas are ~0 and normalized bars would be meaningless
+  // full-width "-0.000". Show the honest reason instead.
+  if(maxAbs<0.01){
+    cap.style.display='none';
+    const why=currentActual===1?' That is exactly why this genuine fraud slips through.':'';
+    document.getElementById('ex-rows').innerHTML=
+      `<div class="ex-none">No single feature stands out — every value sits near its dataset median, so the ensemble sees nothing anomalous.${why}</div>`;
+    return;
+  }
+  cap.style.display='';
+  document.getElementById('ex-rows').innerHTML=ds.filter(d=>Math.abs(d.delta)>=maxAbs*0.03).map(d=>{
+    const up=d.delta>0, w=Math.max(5,Math.abs(d.delta)/maxAbs*100);
     const sign=(d.delta>=0?'+':'')+d.delta.toFixed(3);
     return `<div class="ex-row ${up?'ex-up':'ex-down'}"><span class="ek">${d.f}</span><span class="ex-bar"><i style="width:${w}%"></i></span><span class="ev">${sign}</span></div>`;
   }).join('');
-  document.getElementById('explain').style.display='block';
 }
 
 /* ---- run ---- */
