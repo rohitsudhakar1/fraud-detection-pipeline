@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
 <style>
   :root{
     --bg:#080a0e;
@@ -111,7 +112,7 @@
   .sec-sub{color:var(--muted);max-width:64ch;margin-bottom:42px;font-size:16.5px}
 
   /* ---------- CONSOLE ---------- */
-  .console{display:grid;grid-template-columns:.92fr 1.08fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+  .console{display:grid;grid-template-columns:.92fr 1.08fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;position:relative}
   @media(max-width:920px){.console{grid-template-columns:1fr}}
   .pane{background:var(--panel);padding:28px}
   .pane-h{font-family:'JetBrains Mono',monospace;font-size:12px;letter-spacing:.13em;text-transform:uppercase;color:var(--faint);margin-bottom:20px;display:flex;justify-content:space-between;align-items:center}
@@ -162,15 +163,41 @@
   .feat .fv{font-family:'JetBrains Mono',monospace;font-size:11.5px;margin-top:2px}
   .feat .fv.neg{color:#ff8079}.feat .fv.pos{color:#5fd6a0}
 
-  .live-box{margin-top:20px;border-top:1px solid var(--line);padding-top:18px}
-  .live-toggle{display:flex;align-items:center;gap:10px;font-size:13.5px;color:var(--muted);cursor:pointer;user-select:none}
-  .live-toggle input{accent-color:var(--accent);width:16px;height:16px}
-  .live-fields{margin-top:12px;display:none;gap:8px}
-  .live-fields.show{display:flex}
-  .live-fields input{flex:1;background:var(--bg);border:1px solid var(--line-2);color:var(--text);padding:9px 12px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:12.5px}
-  .live-fields input:focus{outline:none;border-color:var(--accent)}
-  .mode-note{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);margin-top:10px}
+  /* custom-input controls */
+  .custom-box{margin-top:18px;border-top:1px solid var(--line);padding-top:16px}
+  .custom-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+  .field{flex:1;min-width:120px}
+  .field label{display:block;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);margin-bottom:5px}
+  .field input{width:100%;background:var(--bg);border:1px solid var(--line-2);color:var(--text);padding:9px 11px;border-radius:8px;font-family:'JetBrains Mono',monospace;font-size:13px}
+  .field input:focus{outline:none;border-color:var(--accent)}
+  .mini{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .mini button{background:var(--bg-1);border:1px solid var(--line-2);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:7px 12px;border-radius:8px;cursor:pointer;transition:.18s}
+  .mini button:hover{border-color:var(--accent);color:var(--text)}
+  .mode-note{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--faint);margin-top:12px;line-height:1.5}
   .mode-note b{color:var(--accent)}
+
+  /* editable feature inputs */
+  .feat input{width:100%;background:transparent;border:none;border-bottom:1px dashed transparent;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11.5px;padding:1px 0;margin-top:2px}
+  .feat input:hover{border-bottom-color:var(--line-2)}
+  .feat input:focus{outline:none;border-bottom-color:var(--accent);color:var(--accent)}
+  .feat input.neg{color:#ff8079}.feat input.pos{color:#5fd6a0}
+
+  /* explanation panel */
+  .explain{width:100%;margin-top:26px}
+  .ex-row{display:grid;grid-template-columns:64px 1fr 58px;align-items:center;gap:10px;margin-bottom:7px;font-family:'JetBrains Mono',monospace;font-size:12px}
+  .ex-row .ek{color:var(--muted);text-align:right}
+  .ex-bar{height:14px;border-radius:4px;position:relative;background:var(--bg-2);overflow:hidden}
+  .ex-bar i{position:absolute;top:0;bottom:0;border-radius:4px;transition:width .6s ease}
+  .ex-row .ev{color:var(--faint);font-size:10.5px}
+  .ex-up i{background:var(--block);left:0}
+  .ex-down i{background:var(--approve);right:0}
+  .ex-cap{font-size:11px;color:var(--faint);margin-top:8px;line-height:1.5}
+
+  /* loading veil */
+  .veil{position:absolute;inset:0;background:rgba(8,10,14,.82);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;z-index:20;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--muted);transition:opacity .4s;border-radius:var(--r)}
+  .veil.hidden{opacity:0;pointer-events:none}
+  .spin{width:26px;height:26px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* ---------- PIPELINE ---------- */
   .pipe{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
@@ -241,18 +268,23 @@
     <p class="sec-sub">Pick a transaction, run it through the calibrated ensemble, and watch the decision land. These four rows are drawn from the held-out test set and span the decision surface — including a fraud the model misses and a legitimate charge that looks like fraud. The score is the real model output; nothing is hand-tuned.</p>
 
     <div class="console">
+      <div class="veil" id="veil"><div class="spin"></div><div id="veil-msg">loading model into your browser…</div></div>
       <div class="pane">
-        <div class="pane-h"><span>Held-out transactions</span><span id="catalog-tag">4 samples</span></div>
+        <div class="pane-h"><span>Held-out transactions</span><span id="catalog-tag">4 presets</span></div>
         <div id="tx-list"></div>
         <div class="run-row">
           <button class="btn btn-primary run-btn" id="run">▶ Score transaction</button>
         </div>
-        <div class="live-box">
-          <label class="live-toggle"><input type="checkbox" id="live-chk" /> Score against a live API instead of replaying</label>
-          <div class="live-fields" id="live-fields">
-            <input id="api-url" placeholder="https://your-endpoint  (POST /score)" />
+        <div class="custom-box">
+          <div class="custom-row">
+            <div class="field"><label>Amount ($)</label><input id="in-amount" type="number" step="0.01" value="1.00" /></div>
+            <div class="field"><label>Time (s)</label><input id="in-time" type="number" step="1" value="68207" /></div>
           </div>
-          <div class="mode-note" id="mode-note">Mode: <b>replay</b> — showing the model's real recorded output on this row.</div>
+          <div class="mini">
+            <button id="btn-random">🎲 Random real transaction</button>
+            <button id="btn-reset">↺ Reset to preset</button>
+          </div>
+          <div class="mode-note" id="mode-note">The model runs <b>entirely in your browser</b> via ONNX — no server. Edit Amount, Time, or any V-feature on the right, then score. Outputs match the Python model to ~1e-4.</div>
         </div>
       </div>
 
@@ -287,8 +319,14 @@
             <div class="band-lab"><span>0 · approve</span><span>0.43 · review</span><span>0.95 · block →1.0</span></div>
           </div>
 
+          <div class="explain" id="explain" style="display:none">
+            <div class="pane-h" style="margin-bottom:12px"><span>Top drivers of this decision</span><span class="mono" style="color:var(--faint)">occlusion</span></div>
+            <div id="ex-rows"></div>
+            <div class="ex-cap">Each bar is the real score change when that feature is reset to its dataset median (occlusion attribution). <span style="color:#ff8079">Red</span> pushed toward fraud, <span style="color:#5fd6a0">green</span> toward legitimate.</div>
+          </div>
+
           <div class="feat-h" style="width:100%">
-            <div class="pane-h" style="margin-bottom:12px"><span>Input feature vector</span><span class="mono" style="color:var(--faint)">30 dims</span></div>
+            <div class="pane-h" style="margin-bottom:12px"><span>Input feature vector · editable</span><span class="mono" style="color:var(--faint)">30 dims</span></div>
             <div class="feat-grid" id="feat-grid"></div>
           </div>
         </div>
@@ -342,7 +380,7 @@
 </footer>
 
 <script>
-/* ---- real model outputs on held-out test rows (replayed) ---- */
+/* ---- preset transactions; scored live in-browser like everything else ---- */
 const EXAMPLES = [
   {note:"Clear fraud", desc:"Extreme PCA components across the board", label:"fraud", actual:1, score:1.0,
    tx:{"V1":-13.1927,"V2":12.786,"V3":-9.9067,"V4":3.3203,"V5":-4.8012,"V6":5.7601,"V7":-18.7509,"V8":-37.3534,"V9":-0.3915,"V10":-5.0525,"V11":4.4068,"V12":-4.6108,"V13":-1.9095,"V14":-9.0727,"V15":-0.2261,"V16":-6.2116,"V17":-6.2481,"V18":-3.1492,"V19":0.0516,"V20":-3.493,"V21":27.2028,"V22":-8.887,"V23":5.3036,"V24":-0.6394,"V25":0.2632,"V26":-0.1089,"V27":1.2696,"V28":0.9394,"Time":68207,"Amount":1.0}},
@@ -354,49 +392,107 @@ const EXAMPLES = [
    tx:{"V1":1.8659,"V2":-0.4177,"V3":-1.6165,"V4":0.145,"V5":0.8437,"V6":0.891,"V7":-0.0231,"V8":0.1932,"V9":0.606,"V10":-0.1023,"V11":-0.568,"V12":0.4428,"V13":-0.1341,"V14":0.3364,"V15":0.6362,"V16":-0.9861,"V17":0.4945,"V18":-2.0519,"V19":-0.7287,"V20":-0.1834,"V21":-0.1677,"V22":-0.371,"V23":0.3135,"V24":-0.5509,"V25":-0.3669,"V26":0.3496,"V27":-0.0402,"V28":-0.0616,"Time":144761,"Amount":56.83}},
 ];
 const T_REVIEW=0.43, T_BLOCK=0.95;
+const RAW=[...Array(28)].map((_,i)=>'V'+(i+1)).concat(['Time','Amount']);
 
-/* ---- catalog ---- */
+/* ---- model state (loaded in-browser via onnxruntime-web) ---- */
+let META=null, SX=null, SL=null, SAMPLE=[];
+let current={...EXAMPLES[0].tx};   // working raw transaction (30 fields)
+let currentActual=EXAMPLES[0].actual;  // 0/1, or null once hand-edited
+let selectedPreset=0, scoreTimer=null;
+
+/* ---- feature engineering ported from src/features.py ---- */
+function buildVector(tx){
+  const fc=META.feature_cols;
+  const hour=Math.floor(tx.Time/3600)%24;
+  const logA=Math.log(1+tx.Amount);
+  const e=META.amount_bins; let band=0;
+  for(let k=0;k<e.length-1;k++){ if(tx.Amount>e[k]&&tx.Amount<=e[k+1]){band=k;break;} }
+  const derived={hour_of_day:hour, log_amount:logA, amount_band:band};
+  const v=new Float32Array(fc.length);
+  for(let i=0;i<fc.length;i++){ const c=fc[i]; v[i]=(c in tx)?tx[c]:derived[c]; }
+  return v;
+}
+function interp(xs,ys,p){
+  const n=xs.length;
+  if(p<=xs[0])return ys[0]; if(p>=xs[n-1])return ys[n-1];
+  let lo=0,hi=n-1; while(hi-lo>1){const m=(lo+hi)>>1; if(xs[m]<=p)lo=m;else hi=m;}
+  const t=(p-xs[lo])/(xs[hi]-xs[lo]); return ys[lo]+t*(ys[hi]-ys[lo]);
+}
+function ensemble(px,pl){
+  const cx=interp(META.iso_xgb.x,META.iso_xgb.y,px);
+  const cl=interp(META.iso_lgb.x,META.iso_lgb.y,pl);
+  return META.weight_xgb*cx+(1-META.weight_xgb)*cl;
+}
+async function scoreTx(tx){
+  const v=buildVector(tx);
+  // ORT-web shares one wasm backend; run the two sessions sequentially, not
+  // concurrently (Promise.all on run() corrupts the single execution frame).
+  const rx=await SX.run({input:new ort.Tensor('float32',v,[1,v.length])});
+  const rl=await SL.run({input:new ort.Tensor('float32',v,[1,v.length])});
+  return ensemble(rx.probabilities.data[1], rl.probabilities.data[1]);
+}
+/* occlusion attribution: reset each raw feature to its median, re-score in one batch */
+async function occlusion(tx,base){
+  const rows=RAW.length, D=META.feature_cols.length;
+  const big=new Float32Array(rows*D);
+  for(let r=0;r<rows;r++){ const t2={...tx}; t2[RAW[r]]=META.medians[RAW[r]]; big.set(buildVector(t2),r*D); }
+  const rx=await SX.run({input:new ort.Tensor('float32',big,[rows,D])});
+  const rl=await SL.run({input:new ort.Tensor('float32',big,[rows,D])});
+  const px=rx.probabilities.data, pl=rl.probabilities.data;
+  const out=[];
+  for(let r=0;r<rows;r++){ out.push({f:RAW[r], delta:base-ensemble(px[r*2+1],pl[r*2+1])}); }
+  out.sort((a,b)=>Math.abs(b.delta)-Math.abs(a.delta));
+  return out.slice(0,6);
+}
+
+/* ---- catalog of presets ---- */
 const list=document.getElementById('tx-list');
-let selected=0;
 EXAMPLES.forEach((e,i)=>{
   const c=document.createElement('div');
   c.className='tx-card'+(i===0?' active':'');
   c.innerHTML=`<div class="tt">${e.note}<span class="chip ${e.label}">actual: ${e.label}</span></div>
     <div class="td">${e.desc}</div>
     <div class="tx-meta"><span>$${e.tx.Amount.toFixed(2)}</span><span>t=${e.tx.Time}s</span></div>`;
-  c.onclick=()=>{selected=i;[...list.children].forEach(x=>x.classList.remove('active'));c.classList.add('active');resetResult();renderFeatures(e);};
+  c.onclick=()=>selectPreset(i);
   list.appendChild(c);
 });
+function highlight(i){[...list.children].forEach((x,j)=>x.classList.toggle('active',j===i));}
 
-/* ---- feature readout ---- */
+/* ---- editable feature grid ---- */
 const featGrid=document.getElementById('feat-grid');
-function renderFeatures(e){
-  const keys=Object.keys(e.tx);
-  featGrid.innerHTML=keys.map(k=>{
-    const v=e.tx[k]; const cls=k.startsWith('V')?(v<0?'neg':'pos'):'';
-    const disp=(k==='Time')?v+'s':(k==='Amount')?'$'+v:v.toFixed(2);
-    return `<div class="feat"><div class="fk">${k}</div><div class="fv ${cls}">${disp}</div></div>`;
+const inA=document.getElementById('in-amount'), inT=document.getElementById('in-time');
+function renderFeatures(){
+  featGrid.innerHTML=RAW.map(k=>{
+    const v=current[k];
+    if(k==='Time'||k==='Amount'){
+      const d=k==='Time'?Math.round(v)+'s':'$'+(+v).toFixed(2);
+      return `<div class="feat"><div class="fk">${k}</div><div class="fv" data-mirror="${k}">${d}</div></div>`;
+    }
+    return `<div class="feat"><div class="fk">${k}</div><input class="${v<0?'neg':'pos'}" data-k="${k}" value="${v}"></div>`;
   }).join('');
+  featGrid.querySelectorAll('input[data-k]').forEach(inp=>{
+    inp.addEventListener('input',()=>{
+      const val=parseFloat(inp.value);
+      if(!isNaN(val)){ current[inp.dataset.k]=val; inp.className=val<0?'neg':'pos'; markEdited(); scheduleScore(); }
+    });
+  });
 }
-renderFeatures(EXAMPLES[0]);
+function syncMirror(){ featGrid.querySelectorAll('[data-mirror]').forEach(el=>{ const k=el.dataset.mirror; el.textContent=k==='Time'?Math.round(current[k])+'s':'$'+(+current[k]).toFixed(2); }); }
+inA.addEventListener('input',()=>{const v=parseFloat(inA.value); if(!isNaN(v)){current.Amount=v;syncMirror();markEdited();scheduleScore();}});
+inT.addEventListener('input',()=>{const v=parseFloat(inT.value); if(!isNaN(v)){current.Time=v;syncMirror();markEdited();scheduleScore();}});
 
-/* ---- gauge geometry ---- */
-const ARC=377; // length of the semicircle path (r=120, π·120≈377)
+function setCurrent(tx,actual){ current={...tx}; currentActual=actual; inA.value=(+tx.Amount).toFixed(2); inT.value=Math.round(tx.Time); renderFeatures(); }
+function markEdited(){ if(currentActual!==null){ currentActual=null; highlight(-1); } }
+function selectPreset(i){ selectedPreset=i; setCurrent(EXAMPLES[i].tx,EXAMPLES[i].actual); highlight(i); runScore(); }
+function loadRandom(){ const s=SAMPLE[Math.floor(Math.random()*SAMPLE.length)]; setCurrent(s.tx,s.actual); highlight(-1); runScore(); }
+function scheduleScore(){ clearTimeout(scoreTimer); scoreTimer=setTimeout(runScore,280); }
+
+/* ---- gauge ---- */
+const ARC=377; // semicircle r=120 -> π·120 ≈ 377
 const fill=document.getElementById('g-fill');
 fill.style.strokeDasharray=ARC; fill.style.strokeDashoffset=ARC;
 function colorFor(s){return s>=T_BLOCK?'var(--block)':s>=T_REVIEW?'var(--review)':'var(--approve)';}
 function decisionFor(s){return s>=T_BLOCK?['block','BLOCK']:s>=T_REVIEW?['review','MANUAL REVIEW']:['approve','APPROVE'];}
-
-function resetResult(){
-  fill.style.strokeDashoffset=ARC;
-  document.getElementById('needle').style.transform='rotate(-90deg)';
-  document.getElementById('score').textContent='—';
-  document.getElementById('marker').style.left='0';
-  const d=document.getElementById('decision');
-  d.textContent='awaiting input';d.style.color='var(--muted)';d.style.borderColor='var(--line-2)';d.style.background='transparent';
-  document.getElementById('verdict').textContent='Press score to run the ensemble.';
-  document.getElementById('lat-tag').textContent='';
-}
 
 function paint(score,latency){
   const col=colorFor(score);
@@ -404,59 +500,76 @@ function paint(score,latency){
   fill.style.strokeDashoffset=ARC*(1-score);
   document.getElementById('needle').style.transform=`rotate(${score*180-90}deg)`;
   document.getElementById('marker').style.left=(score*100)+'%';
-  // count up score
   const el=document.getElementById('score');let s=0;const tgt=score;
   clearInterval(el._iv);el._iv=setInterval(()=>{s+=tgt/22;if(s>=tgt){s=tgt;clearInterval(el._iv);}el.textContent=s.toFixed(4);el.style.color=col;},26);
   const [cls,txt]=decisionFor(score);
   const d=document.getElementById('decision');
   d.textContent=txt;d.style.color=`var(--${cls})`;d.style.borderColor=`var(--${cls})`;d.style.background='rgba(255,255,255,.02)';
-  // honest verdict vs ground truth
-  const e=EXAMPLES[selected];
-  const predFraud=score>=T_REVIEW, isFraud=e.actual===1;
   let v='';
-  if(isFraud&&score>=T_BLOCK)v='<span class="ok">Caught.</span> True fraud, auto-blocked before settlement.';
-  else if(isFraud&&predFraud)v='<span class="ok">Flagged.</span> True fraud routed to manual review.';
-  else if(isFraud&&!predFraud)v='<span class="miss">Missed.</span> A genuine fraud scored below threshold — the model is not perfect, and pretending otherwise would be dishonest.';
-  else if(!isFraud&&score>=T_BLOCK)v='<span class="miss">False positive.</span> A good customer would be wrongly blocked here.';
-  else if(!isFraud&&predFraud)v='Legitimate, but flagged for review — the safer failure mode. A human clears it without auto-declining the charge.';
-  else v='<span class="ok">Approved.</span> Legitimate charge, scored near zero. No friction.';
+  if(currentActual===null){
+    v = score>=T_BLOCK ? '<span class="miss">Auto-blocked.</span> Above the 0.95 block threshold.'
+      : score>=T_REVIEW ? 'Routed to manual review (0.43-0.95 band) — a human makes the call before declining.'
+      : '<span class="ok">Approved.</span> Below the 0.43 review threshold; no friction for the customer.';
+  } else {
+    const isFraud=currentActual===1, predFraud=score>=T_REVIEW;
+    if(isFraud&&score>=T_BLOCK)v='<span class="ok">Caught.</span> True fraud, auto-blocked before settlement.';
+    else if(isFraud&&predFraud)v='<span class="ok">Flagged.</span> True fraud routed to manual review.';
+    else if(isFraud)v='<span class="miss">Missed.</span> A genuine fraud scored below threshold — the model is not perfect, and pretending otherwise would be dishonest.';
+    else if(score>=T_BLOCK)v='<span class="miss">False positive.</span> A good customer would be wrongly blocked here.';
+    else if(predFraud)v='Legitimate, but flagged for review — the safer failure mode. A human clears it without auto-declining.';
+    else v='<span class="ok">Approved.</span> Legitimate charge, scored near zero. No friction.';
+  }
   document.getElementById('verdict').innerHTML=v;
-  if(latency!=null)document.getElementById('lat-tag').textContent=latency+' ms';
+  if(latency!=null)document.getElementById('lat-tag').textContent=latency+' ms · in-browser';
 }
 
-/* ---- run (replay or live) ---- */
+function renderExplain(ds){
+  const maxAbs=Math.max(...ds.map(d=>Math.abs(d.delta)),1e-6);
+  document.getElementById('ex-rows').innerHTML=ds.map(d=>{
+    const up=d.delta>0, w=Math.max(4,Math.abs(d.delta)/maxAbs*100);
+    const sign=(d.delta>=0?'+':'')+d.delta.toFixed(3);
+    return `<div class="ex-row ${up?'ex-up':'ex-down'}"><span class="ek">${d.f}</span><span class="ex-bar"><i style="width:${w}%"></i></span><span class="ev">${sign}</span></div>`;
+  }).join('');
+  document.getElementById('explain').style.display='block';
+}
+
+/* ---- run ---- */
 const runBtn=document.getElementById('run');
-const liveChk=document.getElementById('live-chk');
-const liveFields=document.getElementById('live-fields');
-const modeNote=document.getElementById('mode-note');
-liveChk.onchange=()=>{
-  liveFields.classList.toggle('show',liveChk.checked);
-  modeNote.innerHTML=liveChk.checked
-    ? 'Mode: <b>live</b> — POSTs the feature vector to <span class="mono">{url}/score</span>.'
-    : 'Mode: <b>replay</b> — showing the model\'s real recorded output on this row.';
-};
-runBtn.onclick=async()=>{
-  const e=EXAMPLES[selected];
-  resetResult();
-  runBtn.disabled=true;runBtn.textContent='scoring…';
-  if(liveChk.checked){
-    const url=(document.getElementById('api-url').value||'').replace(/\/$/,'');
-    try{
-      const t0=performance.now();
-      const r=await fetch(url+'/score',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(e.tx)});
-      if(!r.ok)throw new Error('HTTP '+r.status);
-      const j=await r.json();
-      const lat=j.latency_ms!=null?j.latency_ms:Math.round(performance.now()-t0);
-      setTimeout(()=>paint(j.score,lat),120);
-    }catch(err){
-      document.getElementById('verdict').innerHTML='<span class="miss">Live call failed:</span> '+err.message+'. Falling back to replay.';
-      setTimeout(()=>paint(e.score,null),200);
-    }
-  }else{
-    setTimeout(()=>paint(e.score,Math.floor(8+Math.random()*9)),260);
+runBtn.onclick=runScore;
+let running=false;
+async function runScore(){
+  if(!SX||running)return;
+  running=true; runBtn.disabled=true; runBtn.textContent='scoring…';
+  try{
+    const t0=performance.now();
+    const score=await scoreTx(current);
+    const lat=Math.max(1,Math.round(performance.now()-t0));
+    paint(score,lat);
+    renderExplain(await occlusion(current,score));
+  }catch(err){ document.getElementById('verdict').innerHTML='<span class="miss">Scoring error:</span> '+err.message; }
+  running=false; runBtn.disabled=false; runBtn.textContent='▶ Score transaction';
+}
+document.getElementById('btn-random').onclick=loadRandom;
+document.getElementById('btn-reset').onclick=()=>selectPreset(selectedPreset);
+
+/* ---- load the model into the browser ---- */
+(async()=>{
+  const veil=document.getElementById('veil');
+  try{
+    ort.env.wasm.wasmPaths='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/';
+    const base=new URL('model/',location.href).href;
+    META=await (await fetch(base+'meta.json')).json();
+    SX=await ort.InferenceSession.create(base+'xgb.onnx');
+    SL=await ort.InferenceSession.create(base+'lgb.onnx');
+    try{ SAMPLE=await (await fetch(base+'sample.json')).json(); }catch(e){ SAMPLE=EXAMPLES.map(e=>({tx:e.tx,actual:e.actual})); }
+    veil.classList.add('hidden');
+    renderFeatures();
+    selectPreset(0);
+  }catch(err){
+    document.getElementById('veil-msg').innerHTML='Could not load the in-browser model.<br>'+err.message;
+    veil.querySelector('.spin').style.display='none';
   }
-  setTimeout(()=>{runBtn.disabled=false;runBtn.textContent='▶ Score transaction';},700);
-};
+})();
 
 /* ---- metric count-up on view ---- */
 const io=new IntersectionObserver((es)=>{es.forEach(en=>{if(!en.isIntersecting)return;
