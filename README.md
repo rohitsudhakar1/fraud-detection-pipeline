@@ -11,6 +11,10 @@ Sift, Stripe Radar): the model is one piece, but the operational surface —
 threshold tuning, calibration, prediction logging, drift dashboards, retraining
 hooks — is what makes it usable in production.
 
+**Live demo:** an interactive scoring console that runs the real model output
+over held-out test transactions →
+<https://rohitsudhakar1.github.io/fraud-detection-pipeline/>
+
 ## Headline Results
 
 Measured on the held-out 20% test split (56,962 transactions, 98 fraud),
